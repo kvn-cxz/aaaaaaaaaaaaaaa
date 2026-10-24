@@ -1,3 +1,13 @@
+
+const SUPABASE_URL = "https://wnwybwewfnstoveamltg.supabase.co";
+const SUPABASE_KEY = "sb_publishable_iPzIHFKMC8_58pUM2Qii6w_gebEGbsv";
+const endpointExcel = "https://inventario-api-m60v.onrender.com";
+
+const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+);
+
 const reader = new Html5Qrcode("reader");
 
 const startBtn = document.getElementById("start");
@@ -7,70 +17,158 @@ const detected = document.getElementById("detected");
 const history = document.getElementById("history");
 const count = document.getElementById("count");
 const saveStatus = document.getElementById("saveStatus");
-const tokenInput = document.getElementById("token");
-const endpointExcel = "https://inventario-api-m60v.onrender.com";
+
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const loginBtn = document.getElementById("login");
+const logoutBtn = document.getElementById("logout");
+const authStatus = document.getElementById("authStatus");
 
 let running = false;
 let records = [];
 let lastCode = null;
 let unlockTimer = null;
+let currentSession = null;
 
-async function enviarAExcel(texto) {
-    const token = tokenInput.value.trim();
+async function actualizarSesion() {
+    const { data, error } = await supabaseClient.auth.getSession();
 
-    if (!token) {
-        saveStatus.textContent =
-            "Lectura guardada en el historial, pero falta la clave para enviarla a Excel.";
+    if (error) {
+        authStatus.textContent = "No se pudo comprobar la sesión.";
         return;
     }
 
-    saveStatus.textContent = "Enviando código a Excel...";
+    currentSession = data.session;
+
+    const conectado = Boolean(currentSession);
+    loginBtn.disabled = conectado;
+    logoutBtn.disabled = !conectado;
+    emailInput.disabled = conectado;
+    passwordInput.disabled = conectado;
+
+    authStatus.textContent = conectado
+        ? "Sesión iniciada. Ya puedes escanear códigos."
+        : "Inicia sesión para conectar el inventario.";
+
+    startBtn.disabled = !conectado || running;
+}
+
+supabaseClient.auth.onAuthStateChange((_event, session) => {
+    currentSession = session;
+
+    const conectado = Boolean(session);
+    loginBtn.disabled = conectado;
+    logoutBtn.disabled = !conectado;
+    emailInput.disabled = conectado;
+    passwordInput.disabled = conectado;
+
+    authStatus.textContent = conectado
+        ? "Sesión iniciada. Ya puedes escanear códigos."
+        : "Inicia sesión para conectar el inventario.";
+
+    startBtn.disabled = !conectado || running;
+});
+
+loginBtn.addEventListener("click", async () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+        authStatus.textContent = "Escribe tu correo y contraseña.";
+        return;
+    }
+
+    loginBtn.disabled = true;
+    authStatus.textContent = "Iniciando sesión...";
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+    });
+
+    if (error) {
+        authStatus.textContent =
+            "No se pudo iniciar sesión. Revisa tus datos.";
+        loginBtn.disabled = false;
+        return;
+    }
+
+    currentSession = data.session;
+    passwordInput.value = "";
+    await actualizarSesion();
+});
+
+logoutBtn.addEventListener("click", async () => {
+    if (running) {
+        try {
+            await reader.stop();
+        } catch (_) {
+            // La cámara podría haberse detenido previamente.
+        }
+
+        running = false;
+        clearTimeout(unlockTimer);
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        status.textContent = "Cámara detenida.";
+    }
+
+    const { error } = await supabaseClient.auth.signOut();
+
+    if (error) {
+        authStatus.textContent =
+            "No se pudo cerrar la sesión. Inténtalo de nuevo.";
+        return;
+    }
+
+    currentSession = null;
+    await actualizarSesion();
+});
+
+async function enviarAExcel(texto) {
+    const { data, error } = await supabaseClient.auth.getSession();
+
+    if (error || !data.session) {
+        saveStatus.textContent =
+            "Debes iniciar sesión antes de enviar códigos.";
+        return;
+    }
+
+    const accessToken = data.session.access_token;
+    saveStatus.textContent = "Enviando código al inventario...";
 
     try {
-        const respuesta = await fetch(
-            `${endpointExcel}/scan`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-QR-Token": token
-                },
-                body: JSON.stringify({
-                    text: texto
-                })
-            }
-        );
+        const respuesta = await fetch(`${endpointExcel}/scan`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({ text: texto })
+        });
 
         const resultado = await respuesta.json();
 
         if (!respuesta.ok) {
-            throw new Error(
-                resultado.error || `Error HTTP ${respuesta.status}`
-            );
+            throw new Error(resultado.error || `Error HTTP ${respuesta.status}`);
         }
 
-        saveStatus.textContent =
-            "✓ Código enviado a Excel correctamente.";
-
+        saveStatus.textContent = "✓ Código enviado al inventario.";
     } catch (error) {
-        console.error("Error al enviar a Excel:", error);
-
+        console.error("Error al enviar el código:", error);
         saveStatus.textContent =
-            "No se pudo enviar a Excel. Revisa la clave y la conexión.";
+            "No se pudo guardar el código. Revisa la conexión.";
     }
 }
 
-// Reinicia la detección cuando el QR deja de verse.
 function scheduleUnlock() {
     clearTimeout(unlockTimer);
     unlockTimer = setTimeout(() => {
         lastCode = null;
-        }, 1200);
-    }
+    }, 1200);
+}
 
 function addRecord(text) {
-    // Evita registrar repetidamente el mismo QR
-    // mientras continúa delante de la cámara.
     if (text === lastCode) {
         scheduleUnlock();
         return;
@@ -81,36 +179,39 @@ function addRecord(text) {
 
     const record = {
         number: records.length + 1,
-        text: text,
+        text,
         date: new Date().toLocaleString("es-MX")
     };
 
     records.push(record);
-
     detected.textContent = text;
-    saveStatus.textContent =
-    "Lectura agregada al historial. Enviando a Excel...";
+    saveStatus.textContent = "Lectura agregada al historial.";
 
     const item = document.createElement("div");
     item.className = "record";
 
     const value = document.createElement("strong");
-    value.textContent = record.number + ". " + record.text;
+    value.textContent = `${record.number}. ${record.text}`;
 
     const date = document.createElement("small");
     date.textContent = record.date;
 
     item.append(value, date);
     history.prepend(item);
-
     count.textContent = records.length;
 
-    // Enviar automáticamente el código escaneado a Excel.
     enviarAExcel(text);
 }
 
 startBtn.addEventListener("click", async () => {
     if (running) return;
+
+    const { data } = await supabaseClient.auth.getSession();
+
+    if (!data.session) {
+        status.textContent = "Inicia sesión antes de activar la cámara.";
+        return;
+    }
 
     startBtn.disabled = true;
     status.textContent = "Solicitando acceso a la cámara...";
@@ -121,13 +222,11 @@ startBtn.addEventListener("click", async () => {
             {
                 fps: 12,
                 qrbox: (width, height) => {
-                    const size = Math.floor(
-                        Math.min(width, height) * 0.7
-                    );
+                    const size = Math.floor(Math.min(width, height) * 0.7);
                     return { width: size, height: size };
                 }
             },
-            (decodedText) => addRecord(decodedText),
+            decodedText => addRecord(decodedText),
             () => {}
         );
 
@@ -136,35 +235,32 @@ startBtn.addEventListener("click", async () => {
         status.textContent =
             "Cámara activa. Apunta al siguiente código QR.";
     } catch (error) {
+        console.error(error);
         status.textContent =
-        "No se pudo abrir la cámara. Comprueba los permisos y que uses HTTPS.";
+            "No se pudo abrir la cámara. Comprueba los permisos y HTTPS.";
         startBtn.disabled = false;
     }
-
 });
 
 stopBtn.addEventListener("click", async () => {
     if (!running) return;
 
-        try {
-            await reader.stop();
-            running = false;
-            clearTimeout(unlockTimer);
-
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            status.textContent = "Cámara detenida.";
-        } catch (error) {
+    try {
+        await reader.stop();
+        running = false;
+        clearTimeout(unlockTimer);
+        startBtn.disabled = !currentSession;
+        stopBtn.disabled = true;
+        status.textContent = "Cámara detenida.";
+    } catch (error) {
         status.textContent =
             "No se pudo detener la cámara correctamente.";
-      }
+    }
 });
 
-// CSV compatible con Excel.
 function csvCell(value) {
     let text = String(value);
 
-    // Evita que un contenido QR se interprete como fórmula.
     if (/^[\s]*[=+\-@]/.test(text)) {
         text = "'" + text;
     }
@@ -172,32 +268,27 @@ function csvCell(value) {
     return '"' + text.replace(/"/g, '""') + '"';
 }
 
-document.getElementById("download")
-    .addEventListener("click", () => {
-        const rows = [
-            ["Número", "Texto QR", "Fecha y hora"],
-            ...records.map(r => [r.number, r.text, r.date])
-        ];
+document.getElementById("download").addEventListener("click", () => {
+    const rows = [
+        ["Número", "Texto QR", "Fecha y hora"],
+        ...records.map(r => [r.number, r.text, r.date])
+    ];
 
-        const csv = "\uFEFF" +
+    const csv = "\uFEFF" +
         rows.map(row => row.map(csvCell).join(",")).join("\r\n");
 
-        const blob = new Blob([csv], {
-            type: "text/csv;charset=utf-8;"
-        });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
 
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
+    a.href = url;
+    a.download = "registro_qr.csv";
+    a.click();
 
-        a.href = url;
-        a.download = "registro_qr.csv";
-        a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
 
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-    });
-
-document.getElementById("clear")
-.addEventListener("click", () => {
+document.getElementById("clear").addEventListener("click", () => {
     if (!confirm("¿Borrar el historial de esta sesión?")) return;
 
     records = [];
@@ -207,3 +298,5 @@ document.getElementById("clear")
     saveStatus.textContent = "";
     lastCode = null;
 });
+
+actualizarSesion();
