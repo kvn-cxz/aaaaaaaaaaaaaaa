@@ -141,7 +141,7 @@ startBtn.addEventListener("click", async () => {
     const tokenInput = document.getElementById("token");
 
     const endpointExcel =
-    "https://feels-eagle-european-european.trycloudflare.com";
+    "https://size-appeared-not-turn.trycloudflare.com";
 });
 
 stopBtn.addEventListener("click", async () => {
