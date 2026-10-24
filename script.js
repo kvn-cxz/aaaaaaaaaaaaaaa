@@ -140,10 +140,7 @@ startBtn.addEventListener("click", async () => {
         "No se pudo abrir la cámara. Comprueba los permisos y que uses HTTPS.";
         startBtn.disabled = false;
     }
-    const tokenInput = document.getElementById("token");
 
-    const endpointExcel =
-    "https://size-appeared-not-turn.trycloudflare.com";
 });
 
 stopBtn.addEventListener("click", async () => {
