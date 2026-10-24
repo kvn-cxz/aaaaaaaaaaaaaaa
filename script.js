@@ -12,6 +12,7 @@ const reader = new Html5Qrcode("reader");
 
 const startBtn = document.getElementById("start");
 const stopBtn = document.getElementById("stop");
+startBtn.disabled = true;
 const status = document.getElementById("status");
 const detected = document.getElementById("detected");
 const history = document.getElementById("history");
