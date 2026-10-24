@@ -126,17 +126,50 @@ logoutBtn.addEventListener("click", async () => {
     await actualizarSesion();
 });
 
+
+let equipoExiste = false;
+
+const equipoForm = document.getElementById("equipoForm");
+const guardarEquipoBtn = document.getElementById("guardarEquipo");
+
+const camposEquipo = [
+    "descripcion",
+    "tipo",
+    "edificio",
+    "nombre_edificio",
+    "salon",
+    "usuario",
+    "estado",
+    "observaciones"
+];
+
+function limpiarFormularioEquipo() {
+    camposEquipo.forEach(campo => {
+        document.getElementById(campo).value = "";
+    });
+}
+
+function mostrarEquipo(equipo) {
+    camposEquipo.forEach(campo => {
+        document.getElementById(campo).value =
+            equipo[campo] ?? "";
+    });
+}
+
 async function enviarAExcel(texto) {
     const { data, error } = await supabaseClient.auth.getSession();
 
     if (error || !data.session) {
-        saveStatus.textContent =
-            "Debes iniciar sesión antes de enviar códigos.";
+        saveStatus.textContent = "Inicia sesión para consultar el equipo.";
+        guardarEquipoBtn.disabled = true;
         return;
     }
 
     const accessToken = data.session.access_token;
-    saveStatus.textContent = "Enviando código al inventario...";
+
+    document.getElementById("codigoEquipo").value = texto;
+    guardarEquipoBtn.disabled = true;
+    saveStatus.textContent = "Buscando equipo en el inventario...";
 
     try {
         const respuesta = await fetch(`${endpointExcel}/scan`, {
@@ -154,13 +187,31 @@ async function enviarAExcel(texto) {
             throw new Error(resultado.error || `Error HTTP ${respuesta.status}`);
         }
 
-        saveStatus.textContent = "✓ Código enviado al inventario.";
+        equipoExiste = resultado.encontrado;
+
+        if (equipoExiste) {
+            mostrarEquipo(resultado.equipo);
+            saveStatus.textContent =
+                "Equipo encontrado. Puedes revisar o editar sus datos.";
+        } else {
+            limpiarFormularioEquipo();
+            saveStatus.textContent =
+                "Equipo no registrado. Completa los datos para darlo de alta.";
+        }
+
+        guardarEquipoBtn.textContent =
+            equipoExiste ? "Guardar cambios" : "Registrar equipo";
+
+        guardarEquipoBtn.disabled = false;
+
     } catch (error) {
-        console.error("Error al enviar el código:", error);
+        console.error("Error al consultar el equipo:", error);
         saveStatus.textContent =
-            "No se pudo guardar el código. Revisa la conexión.";
+            "No se pudo consultar el equipo. Revisa la conexión.";
+        guardarEquipoBtn.disabled = true;
     }
 }
+
 
 function scheduleUnlock() {
     clearTimeout(unlockTimer);
@@ -301,3 +352,73 @@ document.getElementById("clear").addEventListener("click", () => {
 });
 
 actualizarSesion();
+
+
+equipoForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const codigo = document.getElementById("codigoEquipo").value.trim();
+
+    if (!codigo) {
+        saveStatus.textContent = "Primero escanea un código QR.";
+        return;
+    }
+
+    const { data, error } = await supabaseClient.auth.getSession();
+
+    if (error || !data.session) {
+        saveStatus.textContent = "Inicia sesión antes de guardar.";
+        return;
+    }
+
+    const accessToken = data.session.access_token;
+
+    const equipo = {};
+
+    camposEquipo.forEach(campo => {
+        equipo[campo] = document.getElementById(campo).value.trim();
+    });
+
+    guardarEquipoBtn.disabled = true;
+    saveStatus.textContent = "Guardando equipo...";
+
+    try {
+        const url = equipoExiste
+            ? `${endpointExcel}/equipo/${encodeURIComponent(codigo)}`
+            : `${endpointExcel}/equipo`;
+
+        const respuesta = await fetch(url, {
+            method: equipoExiste ? "PUT" : "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${accessToken}`
+            },
+            body: JSON.stringify(
+                equipoExiste ? equipo : { codigo, ...equipo }
+            )
+        });
+
+        const resultado = await respuesta.json();
+
+        if (!respuesta.ok) {
+            throw new Error(resultado.error || `Error HTTP ${respuesta.status}`);
+        }
+
+        equipoExiste = true;
+
+        if (resultado.equipo) {
+            mostrarEquipo(resultado.equipo);
+        }
+
+        guardarEquipoBtn.textContent = "Guardar cambios";
+        saveStatus.textContent = "✓ Equipo guardado correctamente.";
+
+    } catch (error) {
+        console.error("Error al guardar el equipo:", error);
+        saveStatus.textContent =
+            `No se pudo guardar: ${error.message}`;
+    } finally {
+        guardarEquipoBtn.disabled = false;
+    }
+});
+
