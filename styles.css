@@ -5,8 +5,9 @@
       max-width: 600px;
       margin: 0 auto;
       padding: 20px;
-      background: #f3f5f9;
-      color: #202938;
+      background: black;
+      color: white;
+        
     }
 
     h1 { text-align: center; }
