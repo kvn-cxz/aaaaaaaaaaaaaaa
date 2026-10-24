@@ -7,6 +7,7 @@ const detected = document.getElementById("detected");
 const history = document.getElementById("history");
 const count = document.getElementById("count");
 const saveStatus = document.getElementById("saveStatus");
+const tokenInput = document.getElementById("token");
 
 let running = false;
 let records = [];
