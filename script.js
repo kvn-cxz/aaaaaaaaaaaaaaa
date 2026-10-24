@@ -8,6 +8,7 @@ const history = document.getElementById("history");
 const count = document.getElementById("count");
 const saveStatus = document.getElementById("saveStatus");
 const tokenInput = document.getElementById("token");
+const endpointExcel = "https://size-appeared-not-turn.trycloudflare.com";
 
 let running = false;
 let records = [];
