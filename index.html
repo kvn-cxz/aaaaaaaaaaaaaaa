@@ -48,11 +48,53 @@
 </section>
 
 
-  <section class="panel">
-    <h2>Última lectura</h2>
-    <p id="detected">Todavía no hay lecturas.</p>
-    <p id="saveStatus"></p>
-  </section>
+  
+<section class="panel">
+  <h2>Equipo escaneado</h2>
+
+  <p id="detected">Todavía no hay lecturas.</p>
+  <p id="saveStatus"></p>
+
+  <form id="equipoForm">
+    <label for="codigoEquipo">Código QR:</label>
+    <input id="codigoEquipo" type="text" readonly required>
+
+    <label for="descripcion">Descripción:</label>
+    <input id="descripcion" type="text" placeholder="Ej. Silla de oficina">
+
+    <label for="tipo">Tipo de equipo:</label>
+    <input id="tipo" type="text" placeholder="Ej. Mobiliario">
+
+    <label for="edificio">Código del edificio:</label>
+    <input id="edificio" type="text">
+
+    <label for="nombre_edificio">Nombre del edificio:</label>
+    <input id="nombre_edificio" type="text">
+
+    <label for="salon">Salón:</label>
+    <input id="salon" type="text">
+
+    <label for="usuario">Usuario responsable:</label>
+    <input id="usuario" type="text">
+
+    <label for="estado">Estado:</label>
+    <select id="estado">
+      <option value="">Seleccionar estado</option>
+      <option value="En uso">En uso</option>
+      <option value="Disponible">Disponible</option>
+      <option value="En reparación">En reparación</option>
+      <option value="Baja">Baja</option>
+    </select>
+
+    <label for="observaciones">Observaciones:</label>
+    <textarea id="observaciones" rows="3"></textarea>
+
+    <button id="guardarEquipo" type="submit" disabled>
+      Guardar equipo
+    </button>
+  </form>
+</section>
+
 
   <section class="panel">
     <h2>Historial (<span id="count">0</span>)</h2>
