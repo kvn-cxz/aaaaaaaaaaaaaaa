@@ -173,7 +173,7 @@ async function enviarAExcel(texto) {
     saveStatus.textContent = "Buscando equipo en el inventario...";
 
     try {
-        const respuesta = await fetch(`${endpointExcel}/scan`, {
+        const respuesta = await fetch(`${endpointEscaneo}/scan`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
