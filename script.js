@@ -157,6 +157,7 @@ function mostrarEquipo(equipo) {
     });
 }
 
+
 async function enviarAExcel(texto) {
     const { data, error } = await supabaseClient.auth.getSession();
 
@@ -170,10 +171,24 @@ async function enviarAExcel(texto) {
 
     document.getElementById("codigoEquipo").value = texto;
     guardarEquipoBtn.disabled = true;
-    saveStatus.textContent = "Buscando equipo en el inventario...";
+    saveStatus.textContent = "Enviando escaneo y consultando inventario...";
+
+    let escaneoGuardado = false;
 
     try {
-        const respuesta = await fetch(`${endpointEscaneo}/scan`, {
+        // Guardar el escaneo en la cola compartida de Supabase
+        const { error: errorCola } = await supabaseClient
+            .from("cola_escaneos")
+            .insert({ codigo: texto });
+
+        if (errorCola) {
+            console.error("Error al guardar el escaneo:", errorCola);
+        } else {
+            escaneoGuardado = true;
+        }
+
+        // Consultar el inventario mediante Render
+        const respuesta = await fetch(`${endpointExcel}/scan`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -200,6 +215,11 @@ async function enviarAExcel(texto) {
                 "Equipo no registrado. Completa los datos para darlo de alta.";
         }
 
+        if (!escaneoGuardado) {
+            saveStatus.textContent +=
+                " Advertencia: no se pudo enviar el escaneo a la cola.";
+        }
+
         guardarEquipoBtn.textContent =
             equipoExiste ? "Guardar cambios" : "Registrar equipo";
 
@@ -212,6 +232,7 @@ async function enviarAExcel(texto) {
         guardarEquipoBtn.disabled = true;
     }
 }
+
 
 
 function scheduleUnlock() {
