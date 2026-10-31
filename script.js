@@ -2,6 +2,7 @@
 const SUPABASE_URL = "https://wnwybwewfnstoveamltg.supabase.co";
 const SUPABASE_KEY = "sb_publishable_iPzIHFKMC8_58pUM2Qii6w_gebEGbsv";
 const endpointExcel = "https://inventario-api-m60v.onrender.com";
+const endpointEscaneo = "https://pants-creatures-privileges-sentences.trycloudflare.com";
 
 const supabaseClient = window.supabase.createClient(
     SUPABASE_URL,
